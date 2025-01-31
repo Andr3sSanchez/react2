@@ -5,7 +5,6 @@ import passport from 'passport';
 
 const router = Router();
 
-// Ruta de login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -16,15 +15,21 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.cookie('token', token, { httpOnly: true }).json({ message: 'Login exitoso' });
+    res.cookie('token', token, { httpOnly: true }).json({ message: 'Login exitoso', token });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Ruta de usuario actual
 router.get('/current', passport.authenticate('jwt', { session: false }), (req, res) => {
-  res.json({ user: req.user });
+  const userDTO = {
+    id: req.user._id,
+    first_name: req.user.first_name,
+    last_name: req.user.last_name,
+    email: req.user.email,
+    role: req.user.role,
+  };
+  res.json({ user: userDTO });
 });
 
 export default router;
