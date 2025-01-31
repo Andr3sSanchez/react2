@@ -1,31 +1,53 @@
-import dotenv from 'dotenv'; 
 import passport from 'passport';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
-import User from '../models/user.js';
+import { Strategy as LocalStrategy } from 'passport-local';
+import bcrypt from 'bcrypt';
+import UserRepository from '../repositories/user.repository.js';  // Asegurarte de importar el repositorio correcto
+import dotenv from 'dotenv';
 
-dotenv.config(); // Cargar las variables de entorno desde el archivo .env
+dotenv.config();
 
-// Configuración de la estrategia JWT
-const options = {
-  jwtFromRequest: ExtractJwt.fromExtractors([req => req?.cookies?.token]), // Extraer el token desde las cookies
-  secretOrKey: process.env.JWT_SECRET || 'defaultSecretKey', // Usar JWT_SECRET desde el archivo .env, o una clave por defecto
+// Instanciar el repositorio
+const userRepository = new UserRepository();
+
+const jwtOptions = {
+    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+    secretOrKey: process.env.JWT_SECRET
 };
 
-// Configuración de la estrategia Passport para manejar JWT
-passport.use(
-  new JwtStrategy(options, async (jwt_payload, done) => {
-    try {
-      // Buscar el usuario en la base de datos usando el id que viene en el payload del JWT
-      const user = await User.findById(jwt_payload.id);
-      if (user) {
-        return done(null, user); // Si el usuario existe, continuar con la autenticación
-      } else {
-        return done(null, false, { message: 'Usuario no encontrado' }); // Enviar mensaje de error
-      }
-    } catch (error) {
-      return done(error, false, { message: 'Error al verificar el token' }); // Enviar mensaje de error
-    }
-  })
-);
+export default function initializePassport() {
+    passport.use(new JwtStrategy(jwtOptions, async (jwt_payload, done) => {
+        try {
+            // Usar findByEmail si estás pasando el email en el payload del JWT
+            const user = await userRepository.findByEmail(jwt_payload.email); 
+            if (user) return done(null, user);
+            return done(null, false);
+        } catch (error) {
+            return done(error, false);
+        }
+    }));
 
-export default passport;
+    passport.use(new LocalStrategy(async (username, password, done) => {
+        try {
+            const user = await userRepository.findByEmail(username);  
+            if (!user) return done(null, false, { message: 'Usuario no encontrado' });
+
+            const isMatch = bcrypt.compare(password, user.password);
+            if (!isMatch) return done(null, false, { message: 'Contraseña incorrecta' });
+
+            return done(null, user);
+        } catch (error) {
+            return done(error);
+        }
+    }));
+
+    passport.serializeUser((user, done) => done(null, user.id));
+    passport.deserializeUser(async (id, done) => {
+        try {
+            const user = await userRepository.findById(id);
+            done(null, user);
+        } catch (error) {
+            done(error);
+        }
+    });
+}

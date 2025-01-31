@@ -2,8 +2,13 @@ import jwt from 'jsonwebtoken';
 
 // Función para generar el token JWT
 export const generateToken = (user) => {
+  const payload = {
+    id: user._id,  // ID del usuario
+    email: user.email,  // Email del usuario
+    role: user.role  // Rol del usuario
+  };
   // Aquí utilizamos JWT_SECRET que debe estar en el archivo .env
-  return jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
 // Middleware para validar el token JWT

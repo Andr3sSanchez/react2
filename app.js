@@ -1,35 +1,40 @@
 import express from 'express';
-import dotenv from 'dotenv'; // Cargar variables de entorno
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
-import connectDB from './database.js'; // Conexión a MongoDB
-import './src/config/passport.js'; // Configuración de Passport
-import sessionRouter from './src/routes/session.router.js';
-import usersRouter from './src/routes/users.router.js';
+import { connectDB } from './database.js';
+import initializePassport from './src/config/passport.js';
 import productsRouter from './src/routes/products.router.js';
-import cartsRouter from './src/routes/carts.router.js';
+import cartRouter from './src/routes/carts.router.js';
+import usersRouter from './src/routes/users.router.js';
+import sessionRouter from './src/routes/session.router.js';
+import ticketRouter from './src/routes/ticket.router.js';
+import expressSession from 'express-session';
 
-
-dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9090;
 
 // Middleware
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(passport.initialize()); // Inicialización de Passport
+app.use(expressSession({ secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false }));
+
+// Passport
+initializePassport();
+app.use(passport.initialize());
+app.use(passport.session());
+app.use(express.json());
 
 // Rutas
-app.use('/api/sessions', sessionRouter); // Ruta para sesiones
-app.use('/api/users', usersRouter); // Ruta para usuarios
 app.use('/api/products', productsRouter);
-app.use('/api/carts', cartsRouter);
+app.use('/api/carts', cartRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/sessions', sessionRouter);
+app.use('/api/tickets', ticketRouter);
 
-// Conectar a la base de datos y levantar el servidor
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  });
+app.listen(PORT, async () => {
+    await connectDB();
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

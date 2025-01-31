@@ -1,35 +1,39 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/user.js';
+import UserRepository from '../repositories/user.repository.js';
+import { generateToken } from '../utils/jwt.util.js';
 import passport from 'passport';
+import UserDTO from '../dto/user.dto.js'; // Asegúrate de que la ruta sea correcta
+import { authenticateJWT } from '../middleware/auth.middleware.js';
 
 const router = Router();
+const userRepository = new UserRepository();
 
+// 📌 **Login**
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user || !user.isValidPassword(password)) {
-      return res.status(401).json({ message: 'Credenciales incorrectas' });
+    try {
+      if (req.cookies.token) {
+        // Eliminar el token viejo
+        res.clearCookie('token');
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.cookie('token', token, { httpOnly: true }).json({ message: 'Login exitoso', token });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const user = await userRepository.findByEmail(email);
+    if (!user || !user.isValidPassword(password)) {
+        return res.status(401).json({ message: 'Credenciales incorrectas' });
+    }
+
+        const token = generateToken(user);
+        res.cookie('token', token, { httpOnly: true }).json({ message: 'Login exitoso', token });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.get('/current', passport.authenticate('jwt', { session: false }), (req, res) => {
-  const userDTO = {
-    id: req.user._id,
-    first_name: req.user.first_name,
-    last_name: req.user.last_name,
-    email: req.user.email,
-    role: req.user.role,
-  };
-  res.json({ user: userDTO });
+// 📌 **Obtener usuario autenticado**
+router.get('/current', authenticateJWT, (req, res) => {
+  const { id, role, email } = req.user; // Aquí extraemos los datos del usuario
+  res.json({ id, role, email }); // Retornamos los datos necesarios
 });
-
 export default router;
